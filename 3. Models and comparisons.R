@@ -1,5 +1,5 @@
 #------------------------------------------------------------#
-# NMIS 2021 and Conflict intensity data models
+#----------NMIS 2021 and Conflict intensity data models--------#
 library(tidyverse)
 library(SUMMER)
 library(sf)

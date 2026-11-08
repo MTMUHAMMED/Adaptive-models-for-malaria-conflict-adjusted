@@ -29,6 +29,26 @@ data <- NMIS2021_Conflict_data |>
 
 #View(data)
 
+#--------------------------------------------------------------#
+################# DESCRIPTIVE STATISTICS ##################
+#   SUMMARY OF OBSERVATION DATA  ######################################
+library(gtsummary)
+data_descrip <- data |> select(-c(REGNAME, REGCODE,cluster_id, year))
+
+data_pcent <- data_descrip |> 
+  tbl_summary(
+    by = conflict_intensity,                                    
+    statistic = list(all_continuous() ~ "{mean}±{sd}",   # mean ± SD for numeric
+                     all_categorical() ~ "{n}({p}%)"), # counts and percentages
+    digits = all_continuous() ~ 2
+  ) |> 
+  add_n() |>              # adds total N
+  add_overall() |>       # adds overall column
+  modify_header(label = "Characteristics") |> 
+  bold_labels()
+
+as_gt(data_pcent) |>  gt::gtsave("data_description.docx")
+
 ###################################################################
 # Neighborhood matrix (from Nigeria shapefile)
 map <- st_read("Nigeria 2018 DHS sdr shapefiles/sdr_subnational_boundaries2.shp")

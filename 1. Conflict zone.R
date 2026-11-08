@@ -72,7 +72,7 @@ ACLED_ZONE_2021 <- merge(conflict_2021, reg_data,by = "REGNAME", all.x = TRUE)
 ACLED_ZONE_2021 <- ACLED_ZONE_2021 |> arrange(REGCODE) |> select(
   REGNAME,REGCODE, zone
 )
-View(ACLED_ZONE_2021)
+#View(ACLED_ZONE_2021)
 
 # Load Nigeria shapefile
 map <- st_read("Nigeria 2018 DHS sdr shapefiles/sdr_subnational_boundaries2.shp")

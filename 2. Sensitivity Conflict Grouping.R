@@ -1,7 +1,8 @@
 # ============================================================
 # ACLED CONFLICT EXPOSURE FOR THE 2021 NIGERIA MIS
 # Exposure period: 12 October 2020 to 11 October 2021
-# Spatial exposure: conflict events within 10 km of each cluster
+# Spatial exposure: conflict events within 5km, 10 km, & 15km 
+# of each cluster
 # ============================================================
 library(sf)
 library(dplyr)
@@ -30,7 +31,7 @@ conflict_end
 # Read the downloaded ACLED Nigeria dataset
 # ------------------------------------------------------------
 acled_raw <- read_delim("ACLED_2000_2024.csv", delim = ";", escape_double = FALSE, trim_ws = TRUE)
-View(acled_raw)
+#View(acled_raw)
 acled <- acled_raw |>  clean_names()
 # Examine the available ACLED variables
 names(acled)
@@ -58,7 +59,7 @@ violent_event_types <- c(
   "Violence against civilians"
 )
 
-acled_one_year <- acled %>%
+acled_one_year <- acled |> 
   filter(
     country == "Nigeria",
     event_date >= conflict_start,
@@ -104,7 +105,7 @@ nmis_clusters <- nmis_gps_raw |>
     },
     
     geometry = geometry
-  ) %>%
+  ) |> 
   filter(!st_is_empty(geometry))
 
 # Confirm the number of clusters
@@ -133,7 +134,7 @@ acled_sf      <- st_transform(acled_sf, 4326)
 extract_cluster_conflict <- function(
     clusters,
     conflict_events,
-    buffer_km = 10
+    buffer_km
 ) {
   
   # Identify all conflict events within the specified buffer
@@ -172,7 +173,7 @@ extract_cluster_conflict <- function(
         event_indices,
         ,
         drop = FALSE
-      ] %>%
+      ] |> 
         st_drop_geometry()
       
       # Check whether civilian_targeting exists
@@ -236,7 +237,7 @@ extract_cluster_conflict <- function(
     }
   )
   
-  conflict_summary %>%
+  conflict_summary |> 
     mutate(
       # Binary conflict shock
       any_conflict = as.integer(conflict_events > 0),
@@ -270,6 +271,11 @@ extract_cluster_conflict <- function(
 # ------------------------------------------------------------
 # Extract conflict exposure within 10 km
 # ------------------------------------------------------------
+cluster_conflict_5km <- extract_cluster_conflict(
+  clusters = nmis_clusters,
+  conflict_events = acled_sf,
+  buffer_km = 5
+)
 
 cluster_conflict_10km <- extract_cluster_conflict(
   clusters = nmis_clusters,
@@ -277,23 +283,37 @@ cluster_conflict_10km <- extract_cluster_conflict(
   buffer_km = 10
 )
 
+cluster_conflict_15km <- extract_cluster_conflict(
+  clusters = nmis_clusters,
+  conflict_events = acled_sf,
+  buffer_km = 15
+)
+
 # Inspect the results
+head(cluster_conflict_5km)
 head(cluster_conflict_10km)
+head(cluster_conflict_15km)
 #View(cluster_conflict_10km)
+
+# Summary for each buffer
 summary(cluster_conflict_10km$conflict_events)
 summary(cluster_conflict_10km$total_fatalities)
 
 # Number of clusters exposed to at least one conflict event
+table(cluster_conflict_5km$any_conflict)
 table(cluster_conflict_10km$any_conflict)
+table(cluster_conflict_15km$any_conflict)
 
 # Percentage of exposed clusters
+mean(cluster_conflict_5km$any_conflict) * 100
 mean(cluster_conflict_10km$any_conflict) * 100
+mean(cluster_conflict_15km$any_conflict) * 100
 
 #################################################################
 # Read in malaria data
 load("Malaria_2010_2021_covariates.RData")
 nmis_unit <- cleaned_data |> filter(year==2021)
-View(nmis_unit)
+#View(nmis_unit)
 length(unique(nmis_unit$cluster))
 # Ensure the cluster identification variables have the same type
 nmis_unit <- nmis_unit |> 
@@ -331,7 +351,7 @@ conflict_data <- nmis_acled_model_data |>
   mutate(
     conflict_intensity = case_when(
       
-      total_fatalities == 0 ~ "No conflict",
+      total_fatalities == 0 ~ "No fatality",
       
       total_fatalities <= q[1] ~ "Low conflict",
       
@@ -344,11 +364,11 @@ conflict_data <- nmis_acled_model_data |>
 #View(conflict_data)
 table(conflict_data$conflict_intensity)
 
-NMIS2021_Conflict_data <- conflict_data |> select(
+NMIS2021_Conflict_data_10km <- conflict_data |> select(
   REGNAME, REGCODE, cluster_id,year, malaria,NoOfHouseHoldMember,
   NoOfChildren,residence,noOfRooms,ageOfHouseholdHead,MosquitoNet,
   NoOfChildSplepUnderMN,WealthIndex,Gender,Age,MotherEduLevel,any_conflict,
   total_fatalities, conflict_intensity
 )
-save(NMIS2021_Conflict_data, file = "NMIS2021_Conflict_data.RData")
+save(NMIS2021_Conflict_data_10km, file = "NMIS2021_Conflict_data.RData")
 

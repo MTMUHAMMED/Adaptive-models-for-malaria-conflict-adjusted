@@ -1,5 +1,9 @@
-#------------------------------------------------------------#
-#----------NMIS 2021 and Conflict intensity data models--------#
+# UNDER THIS, WE VARIED THE BUFFER DISTANCE AS 5KM, 10KM AND 15KM
+# However, you are to initiate each buffer from section 2.1 and 
+# forward the data here for modeling
+#-----------------------------------------------------------------------#
+#----------NMIS 2021 and Conflict intensity data models-----------------#
+# Her we used 10km buffer which was the best from our sensitivity analysis
 library(tidyverse)
 library(SUMMER)
 library(sf)
@@ -14,7 +18,7 @@ load("NMIS2021_Conflict_data.RData")
 
 #--------------------------------------------------------------#
 # CONVERTING THE VARIABLES TO FACTORS
-data <- NMIS2021_Conflict_data |> 
+data <- NMIS2021_Conflict_data_10km |> 
   mutate(
     residence = factor(residence, levels =c(1,2),labels=c("Urban","Rural")),
     MosquitoNet = factor(MosquitoNet, levels=c(0,1), labels=c("No","Yes")),
@@ -23,7 +27,7 @@ data <- NMIS2021_Conflict_data |>
     Gender = factor(Gender, levels = c(1,2),labels = c("Male","Female")),
     any_conflict = factor(any_conflict, levels=c(0,1), labels=c("No","Yes")),
     conflict_intensity = factor(conflict_intensity,
-                                levels=c("No conflict","Low conflict","Medium conflict","High conflict"),
+                                levels=c("No fatality","Low conflict","Medium conflict","High conflict"),
                                 ordered=TRUE)
   )
 
@@ -32,22 +36,22 @@ data <- NMIS2021_Conflict_data |>
 #--------------------------------------------------------------#
 ################# DESCRIPTIVE STATISTICS ##################
 #   SUMMARY OF OBSERVATION DATA  ######################################
-library(gtsummary)
-data_descrip <- data |> select(-c(REGNAME, REGCODE,cluster_id, year))
+#library(gtsummary)
+#data_descrip <- data |> select(-c(REGNAME, REGCODE,cluster_id, year))
 
-data_pcent <- data_descrip |> 
-  tbl_summary(
-    by = conflict_intensity,                                    
-    statistic = list(all_continuous() ~ "{mean}±{sd}",   # mean ± SD for numeric
-                     all_categorical() ~ "{n}({p}%)"), # counts and percentages
-    digits = all_continuous() ~ 2
-  ) |> 
-  add_n() |>              # adds total N
-  add_overall() |>       # adds overall column
-  modify_header(label = "Characteristics") |> 
-  bold_labels()
+#data_pcent <- data_descrip |> 
+#  tbl_summary(
+#    by = conflict_intensity,                                    
+#    statistic = list(all_continuous() ~ "{mean}±{sd}",   # mean ± SD for numeric
+#                     all_categorical() ~ "{n}({p}%)"), # counts and percentages
+#    digits = all_continuous() ~ 2
+#  ) |> 
+#  add_n() |>              # adds total N
+#  add_overall() |>       # adds overall column
+#  modify_header(label = "Characteristics") |> 
+#  bold_labels()
 
-as_gt(data_pcent) |>  gt::gtsave("data_description.docx")
+#as_gt(data_pcent) |>  gt::gtsave("data_description.docx")
 
 ###################################################################
 # Neighborhood matrix (from Nigeria shapefile)
@@ -112,7 +116,7 @@ prior <- list(
 precprior <- list(prec = list(prior = "pc.prec", param = c(0.5/0.31, 0.01)))
 # Models' formula
 data$idx_state <- match(data$REGCODE, map$REGCODE)
-data$idx_conflict <-match(data$conflict_intensity, unique(data$conflict_intensity))
+data$idx_conflict <- match(data$conflict_intensity, unique(data$conflict_intensity))
 
 #-----------------------------------------------------------#
 ### SETUP FOR ADAPTIVE BYM 2 (General AICAR Model) 
@@ -228,31 +232,37 @@ control.inla <- list(strategy = "adaptive",int.strategy = "auto")
 formula1 <- malaria ~ residence + MosquitoNet + WealthIndex + 
   NoOfHouseHoldMember + NoOfChildren + noOfRooms + ageOfHouseholdHead +
   NoOfChildSplepUnderMN + Gender + Age + MotherEduLevel + 
-  f(idx_state, model = "bym2", graph = g, hyper = prior)
+  f(idx_state, model = "bym2", graph = g, hyper = prior) +
+  f(cluster_id,model = "iid",constr = TRUE)
 
 formula2 <- malaria ~ any_conflict + residence + MosquitoNet + WealthIndex + 
   NoOfHouseHoldMember + NoOfChildren + noOfRooms + ageOfHouseholdHead +
-  NoOfChildSplepUnderMN + Gender + Age + MotherEduLevel + f(idx_state, model = "bym2", graph = g, hyper = prior)
+  NoOfChildSplepUnderMN + Gender + Age + MotherEduLevel + f(idx_state, model = "bym2", graph = g, hyper = prior) +
+  f(cluster_id,model = "iid",constr = TRUE)
 
 formula3 <- malaria ~ conflict_intensity + residence + MosquitoNet + WealthIndex + 
   NoOfHouseHoldMember + NoOfChildren + noOfRooms + ageOfHouseholdHead +
   NoOfChildSplepUnderMN + Gender + Age + MotherEduLevel + 
-  f(idx_state, model = "bym2", graph = g, hyper = prior)
+  f(idx_state, model = "bym2", graph = g, hyper = prior) +
+  f(cluster_id,model = "iid",constr = TRUE)
 
-formula4 <- malaria ~ total_fatalities + residence + MosquitoNet + WealthIndex + 
+formula4 <- malaria ~ log(total_fatalities+1) + residence + MosquitoNet + WealthIndex + 
   NoOfHouseHoldMember + NoOfChildren + noOfRooms + ageOfHouseholdHead +
-  NoOfChildSplepUnderMN + Gender + Age + MotherEduLevel + f(idx_state, model = "bym2", graph = g, hyper = prior)
+  NoOfChildSplepUnderMN + Gender + Age + MotherEduLevel + f(idx_state, model = "bym2", graph = g, hyper = prior)+
+  f(cluster_id,model = "iid",constr = TRUE)
 
 formula5 <- malaria ~ residence + MosquitoNet + WealthIndex + 
   NoOfHouseHoldMember + NoOfChildren + noOfRooms + ageOfHouseholdHead +
   NoOfChildSplepUnderMN + Gender + Age + MotherEduLevel + 
   f(idx_state, model = "bym2", graph = g, hyper = prior) +
-  f(idx_conflict,model = "iid", hyper = precprior)
+  f(idx_conflict,model = "iid", hyper = precprior) +
+  f(cluster_id,model = "iid",constr = TRUE)
 
 formula6 <- malaria ~ residence + MosquitoNet + WealthIndex + 
   NoOfHouseHoldMember + NoOfChildren + noOfRooms + ageOfHouseholdHead +
   NoOfChildSplepUnderMN + Gender + Age + MotherEduLevel +
-  f(idx_state,model = General_AICAR_model,diagonal = 1e-06,extraconstr = constr,n = 2 * num_region)
+  f(idx_state,model = General_AICAR_model,diagonal = 1e-06,extraconstr = constr,n = 2 * num_region) +
+  f(cluster_id,model = "iid",constr = TRUE)
 
 ###################################################################
 # Models fitting
@@ -334,14 +344,32 @@ WAIC_values <- data.frame(
 WAIC_values
 #############################################################
 #-------------------------------------------------------------#
-# GENERAL AICAR MODEL PARAMETERS
+# The intercept (Prevalence when all covariates are reference)
+# Model 1
+#inla.zmarginal(expit(model1$marginals.fixed[[1]])) or
+inla.zmarginal(expit(model1$marginals.fixed[["(Intercept)"]]))
+
+# Model 2
+inla.zmarginal(expit(model2$marginals.fixed[["(Intercept)"]]))
+
+# Model 3 
+inla.zmarginal(expit(model3$marginals.fixed[["(Intercept)"]]))
+
+# Model 4
+inla.zmarginal(expit(model4$marginals.fixed[["(Intercept)"]]))
+
+# Model 5
+inla.zmarginal(expit(model5$marginals.fixed[["(Intercept)"]]))
+
+# Model 6: AICAR MODEL PARAMETERS
 # Intercept (mean)
-fit <- inla.tmarginal(function(x) expit(x),
-                      model6$marginals.fixed[[1]])
+inla.zmarginal(expit(model6$marginals.fixed[["(Intercept)"]]))
 
-inla.zmarginal(fit)
-
-# Adaptive
+#--------------------------------------------------------------------#
+# Parameters for model 1 to 5 can be obtain via
+summary(model1)     # idx_state (tau and phi)
+#--------------------------------------------------------------------#
+#### Parameter Estimates for model6 ####
 tau_post <- inla.tmarginal(fun = exp, 
                            marginal = model6$marginals.hyperpar$`Theta1 for idx_state`)
 tau_sum <- inla.zmarginal(tau_post)
@@ -354,13 +382,14 @@ theta_post <- inla.tmarginal(fun = SUMMER::expit,
                              marginal = model6$marginals.hyperpar$`Theta3 for idx_state`)
 theta_sum <- inla.zmarginal(theta_post)
 
-theta_4 <- inla.tmarginal(fun = SUMMER::expit, 
-                          marginal = model6$marginals.hyperpar$`Theta4 for idx_state`)
-theta_sum <- inla.zmarginal(theta_4)
+psi_post_low <- inla.tmarginal(fun = exp, 
+                               marginal = model6$marginals.hyperpar$`Theta4 for idx_state`)
+psi_post_low_sum <- inla.zmarginal(psi_post_low)
 
-theta_5 <- inla.tmarginal(fun = SUMMER::expit, 
-                          marginal = model6$marginals.hyperpar$`Theta5 for idx_state`)
-theta_sum <- inla.zmarginal(theta_5)
+psi_post_medium <- inla.tmarginal(fun = exp, 
+                                  marginal = model6$marginals.hyperpar$`Theta5 for idx_state`)
+psi_post_medium_sum <- inla.zmarginal(psi_post_medium)
+
 
 #--------------------------------------------------------------------#
 #########################################################
@@ -677,72 +706,75 @@ prevalence_maps <- combined_maps +
 prevalence_maps
 ####################################################################
 ####################################################################
+width_range <- range(c(Prev_map$ci_width_1, Prev_map$ci_width_2, Prev_map$ci_width_3,
+        Prev_map$ci_width_4, Prev_map$ci_width_5, Prev_map$ci_width_6), na.rm = TRUE)
+
 # 95% Uncertainty maps
 width1 <-  ggplot(data = Prev_map) +
   geom_sf(aes(fill = ci_width_1)) + 
-  scale_fill_distiller(palette = "RdYlBu", name = '95% CI width') +
+  scale_fill_distiller(palette = "RdYlBu", name = '95% CrI width',limits = width_range) +
   labs(title = NULL) + 
   theme_minimal() + 
   theme(legend.position = "right")+
   labs(
     title = 'Model 1'
   )
-width1
+#width1
 
 width2 <-  ggplot(data = Prev_map) +
   geom_sf(aes(fill = ci_width_2)) + 
-  scale_fill_distiller(palette = "RdYlBu", name = '95% CI width') +
+  scale_fill_distiller(palette = "RdYlBu", name = '95% CrI width',limits = width_range) +
   labs(title = NULL) + 
   theme_minimal() + 
   theme(legend.position = "right")+
   labs(
     title = 'Model 2'
   )
-width2
+#width2
 
 width3 <-  ggplot(data = Prev_map) +
   geom_sf(aes(fill = ci_width_3)) + 
-  scale_fill_distiller(palette = "RdYlBu", name = '95% CI width') +
+  scale_fill_distiller(palette = "RdYlBu", name = '95% CrI width',limits = width_range) +
   labs(title = NULL) + 
   theme_minimal() + 
   theme(legend.position = "right")+
   labs(
     title = 'Model 3'
   )
-width3
+#width3
 
 width4 <-  ggplot(data = Prev_map) +
   geom_sf(aes(fill = ci_width_4)) + 
-  scale_fill_distiller(palette = "RdYlBu", name = '95% CI width') +
+  scale_fill_distiller(palette = "RdYlBu", name = '95% CrI width',limits = width_range) +
   labs(title = NULL) + 
   theme_minimal() + 
   theme(legend.position = "right")+
   labs(
     title = 'Model 4'
   )
-width4
+#width4
 
 width5 <-  ggplot(data = Prev_map) +
   geom_sf(aes(fill = ci_width_5)) + 
-  scale_fill_distiller(palette = "RdYlBu", name = '95% CI width') +
+  scale_fill_distiller(palette = "RdYlBu", name = '95% CrI width',limits = width_range) +
   labs(title = NULL) + 
   theme_minimal() + 
   theme(legend.position = "right")+
   labs(
     title = 'Model 5'
   )
-width5
+#width5
 
 width6 <-  ggplot(data = Prev_map) +
   geom_sf(aes(fill = ci_width_6)) + 
-  scale_fill_distiller(palette = "RdYlBu", name = '95% CI width') +
+  scale_fill_distiller(palette = "RdYlBu", name = '95% CrI width',limits = width_range) +
   labs(title = NULL) + 
   theme_minimal() + 
   theme(legend.position = "right")+
   labs(
     title = 'Model 6'
   )
-width6
+#width6
 
 
 uncertainty_maps <- (width1 | width2 | width3) /(width4 | width5 | width6)

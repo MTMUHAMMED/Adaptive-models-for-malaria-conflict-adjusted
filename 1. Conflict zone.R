@@ -35,7 +35,8 @@ ACLED_2021 <- acled_nmis |> mutate(
 ACLED_2021_Summary <- ACLED_2021 |> group_by(admin1) |> 
   summarise(
     conflict_count = n(),
-    total_fatalities = sum(fatalities, na.rm = TRUE)
+    total_fatalities = sum(fatalities, na.rm = TRUE),
+    log_fatality = log(total_fatalities)
   )
 
 #View(ACLED_2021_Summary)
@@ -43,6 +44,7 @@ ACLED_2021_Summary <- ACLED_2021 |> group_by(admin1) |>
 # Dividing into groups
 q <- quantile(
   ACLED_2021_Summary$total_fatalities,
+  #ACLED_2021_Summary$log_fatality,
   probs = c(1/3, 2/3),
   na.rm = TRUE
 )
@@ -136,3 +138,37 @@ adjacency_map <- ggplot() +
   ) 
 
 adjacency_map
+
+
+################################################################
+# Plot
+
+Zones <- ggplot(conflict_2021, 
+                aes(x = log(total_fatalities + 1),
+                    y = REGNAME,
+                    color = as.factor(zone))) +
+  geom_point(size = 4) +
+  scale_color_manual(
+    values = c(
+      "#00BA38",   # Green
+      "#619CFF",  # Blue
+      "#F8766D"  # Salmon red
+      
+    )
+  ) +
+  labs(
+    title = "Tertile classification of armed conflict fatality count",
+    x = "Log(Total fatality + 1)",
+    y = "State",
+    color = "Conflict zone"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.line = element_line(color = "black", linewidth = 0.8),
+    axis.ticks = element_line(color = "black"),
+    axis.text = element_text(color = "black"),
+    axis.title = element_text(color = "black")
+  )
+
+Zones
+

@@ -170,5 +170,7 @@ Zones <- ggplot(conflict_2021,
     axis.title = element_text(color = "black")
   )
 
-Zones
+Zones  #Graph
+
+
 
